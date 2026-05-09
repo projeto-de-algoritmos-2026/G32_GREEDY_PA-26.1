@@ -1,137 +1,314 @@
 import { useState, useCallback } from 'react'
 import './App.css'
+import {
+  MAX_MINING_ROUNDS,
+  BACKPACK_CAPACITY,
+  ALL_GEM_TYPES,
+  generateGemsForRound,
+  playRound,
+  manualKnapsackSelection,
+  calculateTotalScore,
+} from './utils/knapsackGame'
 
-const EMOJIS = ['🍕','🎸','💎','📱','🔧','📚','🎮','👟','🕶','🧲','🪙','🏆','🎯','🧪','💡']
+// ── Components ──
 
-const SEED_ITEMS = [
-  { name: 'Ouro',    emoji: '🥇', weight: 3, value: 9 },
-  { name: 'Laptop',  emoji: '💻', weight: 4, value: 10 },
-  { name: 'Livro',   emoji: '📚', weight: 1, value: 2 },
-  { name: 'Câmera',  emoji: '📷', weight: 5, value: 7 },
-  { name: 'Relógio', emoji: '⌚', weight: 2, value: 6 },
-]
+function PlayerBackpack({ gems, title, totalValue, usedWeight }) {
+  const percentage = (usedWeight / BACKPACK_CAPACITY) * 100
 
-let nextId = 0
-function makeItem(name, emoji, weight, value) {
-  return { id: nextId++, name, emoji, weight, value, ratio: value / weight }
+  return (
+    <div className="player-backpack">
+      <h3>{title}</h3>
+      <div className="backpack-visual">
+        <div className="backpack-container">
+          <div className="backpack-box">
+            <div className="capacity-label">Cap: {BACKPACK_CAPACITY}kg</div>
+            <div className="backpack-fill" style={{ height: `${Math.min(percentage, 100)}%` }}>
+              {gems.map((gem) => (
+                <div key={gem.id} className="gem-item" title={`${gem.name}: ${gem.selectedWeight}kg`}>
+                  <img src={gem.image} alt={gem.name} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="backpack-stats">
+          <div className="stat">
+            <span className="stat-label">Peso:</span>
+            <span className="stat-value">{usedWeight.toFixed(2)}kg / {BACKPACK_CAPACITY}kg</span>
+          </div>
+          <div className="stat">
+            <span className="stat-label">Valor:</span>
+            <span className="stat-value">💰 {totalValue.toFixed(2)}</span>
+          </div>
+          <div className="stat">
+            <span className="stat-label">Itens:</span>
+            <span className="stat-value">{gems.length}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
-function greedy(items, capacity) {
-  const sorted = [...items].sort((a, b) => b.ratio - a.ratio)
-  const chosen = new Set()
-  const log = []
-  let usedWeight = 0
-  let totalValue = 0
+function MinedGemSelector({ gems, roundNumber, onConfirm, onCancel }) {
+  const [selectedWeights, setSelectedWeights] = useState({})
 
-  for (const item of sorted) {
-    if (usedWeight + item.weight <= capacity) {
-      chosen.add(item.id)
-      usedWeight += item.weight
-      totalValue += item.value
-      log.push({
-        id: item.id,
-        msg: `Adicionado "${item.emoji} ${item.name}" (peso ${item.weight}, val ${item.value}, razão ${item.ratio.toFixed(2)})`,
-        type: 'ok',
-      })
-    } else {
-      log.push({
-        id: item.id,
-        msg: `Recusado "${item.emoji} ${item.name}" — peso ${item.weight} excede espaço restante (${(capacity - usedWeight).toFixed(1)})`,
-        type: 'fail',
-      })
+  const usedWeight = Object.values(selectedWeights).reduce((sum, value) => sum + Number(value || 0), 0)
+  const remainingCapacity = Math.max(0, BACKPACK_CAPACITY - usedWeight)
+  const totalValue = gems.reduce((sum, gem) => {
+    const weight = Number(selectedWeights[gem.id] || 0)
+    return sum + weight * gem.ratio
+  }, 0)
+  const isOverCapacity = usedWeight > BACKPACK_CAPACITY
+
+  const updateWeight = (gem, value) => {
+    const numericValue = Number(value)
+    const safeValue = Number.isNaN(numericValue)
+      ? 0
+      : Math.max(0, Math.min(numericValue, gem.weight))
+
+    setSelectedWeights(prev => ({
+      ...prev,
+      [gem.id]: parseFloat(safeValue.toFixed(2)),
+    }))
+  }
+
+  const fillRemaining = (gem) => {
+    const currentWeight = Number(selectedWeights[gem.id] || 0)
+    const availableForGem = BACKPACK_CAPACITY - (usedWeight - currentWeight)
+    updateWeight(gem, Math.min(gem.weight, availableForGem))
+  }
+
+  const handleConfirm = () => {
+    if (usedWeight <= 0) {
+      alert('Escolha pelo menos uma pedra para colocar na mochila!')
+      return
     }
+
+    if (isOverCapacity) {
+      alert(`A mochila suporta apenas ${BACKPACK_CAPACITY}kg.`)
+      return
+    }
+
+    onConfirm(selectedWeights)
   }
 
-  return { sorted, chosen, log, usedWeight, totalValue }
-}
-
-/* ── sub-components ── */
-
-function CapacityControl({ capacity, onChange }) {
-  const [val, setVal] = useState(capacity)
   return (
-    <div className="card">
-      <p className="card-title">⚙ Capacidade da Mochila</p>
-      <div className="capacity-row">
-        <input
-          type="number"
-          min={1}
-          value={val}
-          onChange={e => setVal(e.target.value)}
-        />
-        <button onClick={() => { const n = parseInt(val); if (n > 0) onChange(n) }}>
-          Aplicar
-        </button>
-      </div>
-    </div>
-  )
-}
+    <div className="gem-selector-overlay">
+      <div className="mined-selector">
+        <h2>⛏️ Pedras Mineradas</h2>
+        <p className="gem-selector-subtitle">
+          Rodada {roundNumber}: escolha quais pedras e quantos kg de cada uma vão para a mochila.
+        </p>
 
-function AddItemForm({ itemCount, onAdd }) {
-  const [form, setForm] = useState({ name: '', emoji: '', weight: '', value: '' })
-  const [errors, setErrors] = useState({ weight: false, value: false })
+        <div className="capacity-summary">
+          <div>
+            <span className="stat-label">Peso escolhido</span>
+            <strong className={isOverCapacity ? 'over-capacity' : ''}>
+              {usedWeight.toFixed(2)}kg / {BACKPACK_CAPACITY}kg
+            </strong>
+          </div>
+          <div>
+            <span className="stat-label">Espaço livre</span>
+            <strong>{remainingCapacity.toFixed(2)}kg</strong>
+          </div>
+          <div>
+            <span className="stat-label">Valor estimado</span>
+            <strong>💰 {totalValue.toFixed(2)}</strong>
+          </div>
+        </div>
 
-  function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
+        <div className="mined-gems-list">
+          {gems.map((gem) => {
+            const selectedWeight = Number(selectedWeights[gem.id] || 0)
+            const selectedValue = selectedWeight * gem.ratio
 
-  function handleAdd() {
-    const weight = parseFloat(form.weight)
-    const value  = parseFloat(form.value)
-    const bad = { weight: !weight || weight <= 0, value: !value || value <= 0 }
-    setErrors(bad)
-    if (bad.weight || bad.value) return
-
-    onAdd(
-      form.name.trim()  || `Item ${itemCount + 1}`,
-      form.emoji.trim() || EMOJIS[itemCount % EMOJIS.length],
-      weight,
-      value,
-    )
-    setForm({ name: '', emoji: '', weight: '', value: '' })
-    setErrors({ weight: false, value: false })
-  }
-
-  function handleKey(e) { if (e.key === 'Enter') handleAdd() }
-
-  return (
-    <div className="card">
-      <p className="card-title">➕ Adicionar Item</p>
-      <div className="form-grid">
-        <input placeholder="Nome"     value={form.name}   onChange={e => set('name',   e.target.value)} onKeyDown={handleKey} />
-        <input placeholder="Emoji 🎁" value={form.emoji}  onChange={e => set('emoji',  e.target.value)} maxLength={4} onKeyDown={handleKey} />
-        <input placeholder="Peso"  type="number" min={1} value={form.weight} onChange={e => set('weight', e.target.value)} onKeyDown={handleKey} className={errors.weight ? 'error' : ''} />
-        <input placeholder="Valor" type="number" min={1} value={form.value}  onChange={e => set('value',  e.target.value)} onKeyDown={handleKey} className={errors.value  ? 'error' : ''} />
-      </div>
-      <button className="btn-add" onClick={handleAdd}>Adicionar Item</button>
-    </div>
-  )
-}
-
-function ItemList({ sorted, chosen, onRemove }) {
-  if (sorted.length === 0) return (
-    <div className="card" style={{ flex: 1 }}>
-      <p className="card-title">📦 Itens Disponíveis</p>
-      <p className="empty-hint">Nenhum item ainda.<br />Adicione acima!</p>
-    </div>
-  )
-
-  return (
-    <div className="card" style={{ flex: 1, overflow: 'hidden' }}>
-      <p className="card-title">📦 Itens Disponíveis</p>
-      <div className="item-list">
-        {sorted.map(item => {
-          const inBag = chosen.has(item.id)
-          return (
-            <div key={item.id} className={`item-card ${inBag ? 'selected' : 'rejected'}`}>
-              <span className="item-emoji">{item.emoji}</span>
-              <div className="item-info">
-                <div className="item-name">{item.name}</div>
-                <div className="item-meta">Peso: {item.weight} · Valor: {item.value}</div>
-                <div className="item-ratio">Razão: {item.ratio.toFixed(2)}</div>
+            return (
+              <div key={gem.id} className={`mined-gem-item ${selectedWeight > 0 ? 'selected' : ''}`}>
+                <div className="gem-option-image">
+                  <img src={gem.image} alt={gem.name} />
+                </div>
+                <div className="mined-gem-info">
+                  <div className="gem-name">{gem.name}</div>
+                  <div className="gem-stats">
+                    Minerado: {gem.weight.toFixed(1)}kg • valor/kg: {gem.ratio.toFixed(2)} • total: {gem.value.toFixed(2)}
+                  </div>
+                  <div className="selected-gem-value">
+                    Na mochila: {selectedValue.toFixed(2)} valor
+                  </div>
+                </div>
+                <div className="gem-weight-control">
+                  <input
+                    type="number"
+                    min="0"
+                    max={gem.weight}
+                    step="0.1"
+                    value={selectedWeights[gem.id] ?? ''}
+                    placeholder="0"
+                    onChange={(event) => updateWeight(gem, event.target.value)}
+                    aria-label={`Quantidade de ${gem.name} em kg`}
+                  />
+                  <span>kg</span>
+                  <button type="button" className="btn-small" onClick={() => fillRemaining(gem)}>
+                    Máx.
+                  </button>
+                </div>
               </div>
-              <span className={`item-badge ${inBag ? 'badge-in' : 'badge-out'}`}>
-                {inBag ? 'DENTRO' : 'FORA'}
-              </span>
-              <button className="del-btn" onClick={() => onRemove(item.id)} title="Remover">✕</button>
+            )
+          })}
+        </div>
+
+        <div className="gem-selector-actions">
+          <button onClick={onCancel} className="btn-cancel-selector">
+            Cancelar
+          </button>
+          <button onClick={handleConfirm} className="btn-start-game" disabled={isOverCapacity}>
+            🎒 Guardar na Mochila
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function RoundResult({ round }) {
+  const strategyLabel = round.strategy === 'greedy'
+    ? '🤖 Algoritmo Greedy'
+    : round.strategy === 'manual'
+      ? '🎒 Escolha do Jogador'
+      : '🎲 Sorte'
+
+  return (
+    <div className="round-result">
+      <div className="round-header">
+        <h4>Rodada {round.round} {strategyLabel}</h4>
+      </div>
+
+      <div className="gems-offered">
+        <p className="gems-title">💎 Joias Disponíveis:</p>
+        <div className="gems-list">
+          {round.gems.map((gem) => (
+            <div key={gem.id} className="gem-option">
+              <div className="gem-option-image">
+                <img src={gem.image} alt={gem.name} />
+              </div>
+              <div className="gem-info">
+                <div className="gem-name">{gem.name}</div>
+                <div className="gem-stats">{gem.weight.toFixed(1)}kg • {gem.value.toFixed(2)} valor • razão: {gem.ratio}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="decision-log">
+        <p className="log-title">📋 Decisões:</p>
+        <ul>
+          {round.log.map((entry, i) => (
+            <li key={i} className={`log-entry log-${entry.type}`}>
+              {entry.type === 'added' && '✅'}
+              {entry.type === 'rejected' && '❌'}
+              {entry.type === 'skipped' && '⏭️'}
+              {entry.type === 'fractional' && '✂️'}
+              {' '}
+              {entry.msg}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  )
+}
+
+function GameBoard({ gameState, onPlayRound }) {
+  const playerTotal = calculateTotalScore(gameState.playerRounds)
+  const computerTotal = calculateTotalScore(gameState.computerRounds)
+  const isGameOver = gameState.playerRounds.length >= MAX_MINING_ROUNDS && gameState.computerRounds.length >= MAX_MINING_ROUNDS
+  const currentRoundNum = Math.min(Math.max(gameState.playerRounds.length, gameState.computerRounds.length), MAX_MINING_ROUNDS)
+
+  return (
+    <div className="game-board">
+      <div className="game-header">
+        <h1>⛏️ Quartz Knapsack Game</h1>
+        <p className="subtitle">Jogador vs Computador • Greedy Knapsack</p>
+      </div>
+
+      <div className="game-status">
+        <div className="round-counter">
+          Rodada: {currentRoundNum} / {MAX_MINING_ROUNDS}
+        </div>
+        <div className="strategy-info">
+          {isGameOver
+            ? '✨ Jogo Finalizado!'
+            : currentRoundNum < MAX_MINING_ROUNDS
+              ? '🎲 Fase de Sorte'
+              : '🤖 Rodada Greedy!'}
+        </div>
+      </div>
+
+      <div className="scoreboard">
+        <div className={`score-card ${playerTotal > computerTotal && isGameOver ? 'winner' : ''}`}>
+          <h3>👤 Jogador</h3>
+          <div className="score-value">{playerTotal.toFixed(2)}</div>
+          <div className="score-subtitle">Pontuação Total</div>
+        </div>
+
+        <div className={`score-card ${computerTotal > playerTotal && isGameOver ? 'winner' : ''}`}>
+          <h3>🤖 Computador</h3>
+          <div className="score-value">{computerTotal.toFixed(2)}</div>
+          <div className="score-subtitle">Pontuação Total</div>
+        </div>
+      </div>
+
+      {!isGameOver ? (
+        <div className="actions">
+          <button onClick={onPlayRound} className="btn-play">
+            ⛏️ Ir à Mineração
+          </button>
+        </div>
+      ) : (
+        <div className="game-over">
+          <div className="winner-banner">
+            {playerTotal > computerTotal
+              ? '🎉 VOCÊ VENCEU!'
+              : playerTotal === computerTotal
+                ? '🤝 EMPATE!'
+                : '🤖 COMPUTADOR VENCEU!'}
+          </div>
+          <button onClick={() => window.location.reload()} className="btn-restart">
+            🔄 Jogar Novamente
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RoundsHistory({ playerRounds, computerRounds }) {
+  return (
+    <div className="rounds-history">
+      <h3>📊 Histórico de Rodadas</h3>
+      <div className="history-grid">
+        {Array.from({ length: MAX_MINING_ROUNDS }).map((_, i) => {
+          const playerRound = playerRounds[i]
+          const computerRound = computerRounds[i]
+          const playerScore = playerRound?.totalValue || 0
+          const computerScore = computerRound?.totalValue || 0
+
+          return (
+            <div key={i} className="history-round">
+              <div className="round-number">Rodada {i + 1}</div>
+              <div className="round-scores">
+                <div className={`score ${playerScore >= computerScore ? 'higher' : ''}`}>
+                  👤 {playerScore.toFixed(1)}
+                </div>
+                <div className={`score ${computerScore > playerScore ? 'higher' : ''}`}>
+                  🤖 {computerScore.toFixed(1)}
+                </div>
+              </div>
+              {i === MAX_MINING_ROUNDS - 1 && (
+                <div className="greedy-badge">🤖 Greedy</div>
+              )}
             </div>
           )
         })}
@@ -140,151 +317,127 @@ function ItemList({ sorted, chosen, onRemove }) {
   )
 }
 
-function KnapsackVisual({ capacity, chosen, items, usedWeight, totalValue }) {
-  const pct = capacity > 0 ? Math.min((usedWeight / capacity) * 100, 100) : 0
-  const chosenItems = items.filter(i => chosen.has(i.id))
-  const over = usedWeight > capacity
+function RoundDetails({ round }) {
+  if (!round) return null
 
   return (
-    <div className="card">
-      <div className="knapsack-wrap">
-        <div className="knapsack-container">
-          <div className="knapsack-body">
-            <span className="cap-label">Cap: {capacity}</span>
-            <div className={`knapsack-fill ${over ? 'over' : ''}`} style={{ height: `${pct}%` }}>
-              {chosenItems.map(i => (
-                <span key={i.id} className="fill-item" title={i.name}>{i.emoji}</span>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <p className="knapsack-sublabel">
-          {pct === 0
-            ? 'Mochila vazia'
-            : `${usedWeight.toFixed(1)} / ${capacity} (${pct.toFixed(0)}% cheio)`}
-        </p>
-
-        <div className="stats-row">
-          <div className="stat-box">
-            <div className="stat-val">{usedWeight.toFixed(1)}</div>
-            <div className="stat-lbl">Peso Usado</div>
-          </div>
-          <div className="stat-box">
-            <div className="stat-val">{totalValue.toFixed(1)}</div>
-            <div className="stat-lbl">Valor Total</div>
-          </div>
-          <div className="stat-box">
-            <div className="stat-val">{chosen.size}</div>
-            <div className="stat-lbl">Itens</div>
-          </div>
-        </div>
-      </div>
+    <div className="round-details">
+      <h3>🔍 Detalhes da Rodada {round.round}</h3>
+      <RoundResult round={round} />
+      <PlayerBackpack
+        gems={round.selected}
+        title={round.isComputerTurn ? '🤖 Computador' : '👤 Você'}
+        totalValue={round.totalValue}
+        usedWeight={round.usedWeight}
+      />
     </div>
   )
 }
 
-function DecisionLog({ log }) {
-  return (
-    <div className="card">
-      <p className="card-title">📋 Log de Decisões</p>
-      {log.length === 0
-        ? <p className="empty-hint">Aguardando itens...</p>
-        : (
-          <ul className="log-list">
-            {log.map((e, i) => (
-              <li key={i} className={`log-item ${e.type}`}>
-                {e.type === 'ok' ? '✅' : '❌'} {e.msg}
-              </li>
-            ))}
-          </ul>
-        )}
-    </div>
-  )
-}
-
-function RatioTable({ sorted, chosen }) {
-  if (sorted.length === 0) return (
-    <div className="card">
-      <p className="card-title">📊 Tabela de Razão Valor/Peso</p>
-      <p className="empty-hint">Adicione itens para ver a tabela.</p>
-    </div>
-  )
-
-  return (
-    <div className="card">
-      <p className="card-title">📊 Tabela de Razão Valor/Peso</p>
-      <div className="table-scroll">
-        <table className="ratio-table">
-          <thead>
-            <tr>
-              <th>#</th><th>Item</th><th>Peso</th><th>Valor</th><th>Razão V/P</th><th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((item, i) => {
-              const inBag = chosen.has(item.id)
-              return (
-                <tr key={item.id}>
-                  <td>{i + 1}</td>
-                  <td>{item.emoji} {item.name}</td>
-                  <td>{item.weight}</td>
-                  <td>{item.value}</td>
-                  <td className={inBag ? 'chk' : 'hl'}>{item.ratio.toFixed(3)}</td>
-                  <td className={inBag ? 'chk' : 'hl'}>{inBag ? '✅ Dentro' : '❌ Fora'}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
-
-/* ── App ── */
+// ── Main App ──
 
 export default function App() {
-  const [capacity, setCapacity] = useState(15)
-  const [items, setItems] = useState(() =>
-    SEED_ITEMS.map(s => makeItem(s.name, s.emoji, s.weight, s.value))
-  )
+  const [pendingPlayerMining, setPendingPlayerMining] = useState(null)
+  const [gameState, setGameState] = useState({
+    playerRounds: [],
+    computerRounds: [],
+    lastPlayerRound: null,
+    lastComputerRound: null,
+  })
 
-  const { sorted, chosen, log, usedWeight, totalValue } = greedy(items, capacity)
+  const isPlayerTurn = gameState.playerRounds.length <= gameState.computerRounds.length
 
-  const addItem = useCallback((name, emoji, weight, value) => {
-    setItems(prev => [...prev, makeItem(name, emoji, weight, value)])
-  }, [])
+  const handlePlayerRoundWithSelection = useCallback((selectedWeights) => {
+    if (!pendingPlayerMining) return
 
-  const removeItem = useCallback((id) => {
-    setItems(prev => prev.filter(i => i.id !== id))
-  }, [])
+    const roundNumber = gameState.playerRounds.length + 1
+    const result = manualKnapsackSelection(
+      pendingPlayerMining.gems,
+      selectedWeights,
+      BACKPACK_CAPACITY,
+    )
+    const round = {
+      round: roundNumber,
+      strategy: 'manual',
+      gems: pendingPlayerMining.gems,
+      selected: result.selected,
+      usedWeight: result.usedWeight,
+      totalValue: result.totalValue,
+      log: result.log,
+      isComputerTurn: false,
+    }
+
+    setPendingPlayerMining(null)
+    setGameState(prev => ({
+      ...prev,
+      playerRounds: [...prev.playerRounds, round],
+      lastPlayerRound: round,
+    }))
+  }, [gameState.playerRounds.length, pendingPlayerMining])
+
+  const handlePlayRound = useCallback(() => {
+    if (isPlayerTurn) {
+      const roundNumber = gameState.playerRounds.length + 1
+      setPendingPlayerMining({
+        roundNumber,
+        gems: generateGemsForRound(ALL_GEM_TYPES),
+      })
+      return
+    }
+
+    const roundNumber = gameState.computerRounds.length + 1
+    const computerSelectionIds = roundNumber === MAX_MINING_ROUNDS
+      ? [...ALL_GEM_TYPES]
+        .sort((a, b) => b.density - a.density)
+        .slice(0, 3)
+        .map((gem) => gem.id)
+      : ALL_GEM_TYPES.map((gem) => gem.id)
+
+    const availableGems = ALL_GEM_TYPES.filter(gem => computerSelectionIds.includes(gem.id))
+    const round = playRound(roundNumber, true, availableGems)
+
+    setGameState(prev => ({
+      ...prev,
+      computerRounds: [...prev.computerRounds, round],
+      lastComputerRound: round,
+    }))
+  }, [gameState.computerRounds.length, gameState.playerRounds.length, isPlayerTurn])
+
+  const currentRound = gameState.playerRounds.length > gameState.computerRounds.length
+    ? gameState.lastPlayerRound
+    : gameState.lastComputerRound || gameState.lastPlayerRound
+  const hasGameStarted = gameState.playerRounds.length > 0 || gameState.computerRounds.length > 0
 
   return (
-    <>
-      <h1 className="page-title">🎒 Knapsack Visualizer</h1>
-      <p className="page-subtitle">Algoritmo Greedy — razão valor/peso · Projeto PA G32</p>
+    <div className="app-container">
+      {pendingPlayerMining && (
+        <MinedGemSelector
+          gems={pendingPlayerMining.gems}
+          roundNumber={pendingPlayerMining.roundNumber}
+          onConfirm={handlePlayerRoundWithSelection}
+          onCancel={() => setPendingPlayerMining(null)}
+        />
+      )}
 
-      <div className="layout">
-        <div className="left-panel">
-          <CapacityControl capacity={capacity} onChange={setCapacity} />
-          <AddItemForm itemCount={items.length} onAdd={addItem} />
-          <ItemList sorted={sorted} chosen={chosen} onRemove={removeItem} />
-          <button className="btn-reset" onClick={() => setItems([])}>🗑 Limpar Tudo</button>
-        </div>
+      <GameBoard
+        gameState={gameState}
+        onPlayRound={handlePlayRound}
+      />
 
-        <div className="right-panel">
-          <KnapsackVisual
-            capacity={capacity}
-            chosen={chosen}
-            items={items}
-            usedWeight={usedWeight}
-            totalValue={totalValue}
-          />
-          <DecisionLog log={log} />
-          <RatioTable sorted={sorted} chosen={chosen} />
+      {hasGameStarted && (
+        <div className="game-content">
+          <div className="main-panel">
+            {currentRound && <RoundDetails round={currentRound} />}
+          </div>
+
+          <div className="side-panel">
+            <RoundsHistory
+              playerRounds={gameState.playerRounds}
+              computerRounds={gameState.computerRounds}
+            />
+          </div>
         </div>
-      </div>
-    </>
+      )}
+    </div>
   )
 }
