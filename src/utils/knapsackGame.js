@@ -185,15 +185,16 @@ export function randomChoice(items, capacity) {
 /**
  * Monta a mochila a partir das quantidades escolhidas pelo jogador.
  */
-export function manualKnapsackSelection(items, selections, capacity) {
+export function manualKnapsackSelection(items, selections, capacity, initialWeight = 0) {
   const selected = []
-  let usedWeight = 0
+  let totalWeight = initialWeight
+  let addedWeight = 0
   let totalValue = 0
   const log = []
 
   for (const item of items) {
     const requestedWeight = Number(selections[item.id] || 0)
-    const remaining = parseFloat((capacity - usedWeight).toFixed(2))
+    const remaining = parseFloat((capacity - totalWeight).toFixed(2))
     const selectedWeight = Math.max(0, Math.min(requestedWeight, item.weight, remaining))
 
     if (selectedWeight > 0) {
@@ -205,7 +206,8 @@ export function manualKnapsackSelection(items, selections, capacity) {
         selectedValue,
         isFractional: selectedWeight < item.weight,
       })
-      usedWeight += selectedWeight
+      totalWeight += selectedWeight
+      addedWeight += selectedWeight
       totalValue += selectedValue
       log.push({
         id: item.id,
@@ -223,7 +225,7 @@ export function manualKnapsackSelection(items, selections, capacity) {
 
   return {
     selected,
-    usedWeight: parseFloat(usedWeight.toFixed(2)),
+    usedWeight: parseFloat(addedWeight.toFixed(2)),
     totalValue: parseFloat(totalValue.toFixed(2)),
     log,
   }
@@ -232,14 +234,14 @@ export function manualKnapsackSelection(items, selections, capacity) {
 /**
  * Simula uma rodada completa para um jogador
  */
-export function playRound(roundNumber, isComputerTurn, availableGemTypes = GEM_TYPES) {
+export function playRound(roundNumber, isComputerTurn, availableGemTypes = GEM_TYPES, capacity = BACKPACK_CAPACITY) {
   const gems = generateGemsForRound(availableGemTypes)
   const isGreedyRound = roundNumber === MAX_MINING_ROUNDS
   const strategy = isGreedyRound ? 'greedy' : 'random'
 
   const result = isGreedyRound
-    ? greedyKnapsack(gems, BACKPACK_CAPACITY)
-    : randomChoice(gems, BACKPACK_CAPACITY)
+    ? greedyKnapsack(gems, capacity)
+    : randomChoice(gems, capacity)
 
   return {
     round: roundNumber,
@@ -258,4 +260,18 @@ export function playRound(roundNumber, isComputerTurn, availableGemTypes = GEM_T
  */
 export function calculateTotalScore(rounds) {
   return rounds.reduce((sum, round) => sum + round.totalValue, 0)
+}
+
+/**
+ * Calcula o peso acumulado na mochila ao longo das rodadas.
+ */
+export function calculateTotalWeight(rounds) {
+  return rounds.reduce((sum, round) => sum + round.usedWeight, 0)
+}
+
+/**
+ * Retorna todos os itens que continuam na mesma mochila.
+ */
+export function getBackpackItems(rounds) {
+  return rounds.flatMap(round => round.selected)
 }

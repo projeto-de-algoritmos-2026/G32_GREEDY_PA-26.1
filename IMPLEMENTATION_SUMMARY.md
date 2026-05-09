@@ -10,19 +10,19 @@ Transformamos o projeto de um simples **visualizador de Knapsack** em um **jogo 
 
 ### ✅ Todos os requisitos foram implementados:
 
-1. **Algoritmo Guloso (Greedy) do Knapsack** 
+1. **Algoritmo Guloso (Greedy) do Knapsack**
    - ✅ Implementado em `src/utils/knapsackGame.js`
    - ✅ Ordena joias por razão Valor/Peso
    - ✅ Fracciona últimas joias para otimizar espaço
 
 2. **Jogo Tipo Quartz**
-   - ✅ Jogador vs Computador
+   - ✅ Jogador vs O ganancioso
    - ✅ Sistema de rodadas competitivo
    - ✅ Interface visual atraente com tema "mineração de joias"
 
 3. **5 Rodadas de Mineração**
    - ✅ Cada jogador minera exatamente 5 vezes
-   - ✅ Alternância automática entre Jogador e Computador
+   - ✅ Alternância automática entre Jogador e O ganancioso
    - ✅ Contador de rodadas em tempo real
 
 4. **Estratégia Progressiva**
@@ -45,6 +45,7 @@ Transformamos o projeto de um simples **visualizador de Knapsack** em um **jogo 
 ## 📁 Arquivos Criados/Modificados
 
 ### Novos Arquivos
+
 ```
 src/utils/
   └── knapsackGame.js          # Lógica do jogo e algoritmo
@@ -53,6 +54,7 @@ UPDATE_LOG.md                  # Histórico de alterações
 ```
 
 ### Arquivos Modificados
+
 ```
 src/
   ├── App.jsx                  # Reescrito com nova lógica
@@ -60,6 +62,7 @@ src/
 ```
 
 ### Estrutura Final
+
 ```
 G32_GREEDY_PA-26.1/
 ├── src/
@@ -81,14 +84,16 @@ G32_GREEDY_PA-26.1/
 ## 🎮 Como Jogar
 
 ### Iniciar o Jogo
+
 ```bash
 npm run dev
 # Abra http://localhost:5174/
 ```
 
 ### Gameplay
+
 1. Clique em **"⛏️ Ir à Mineração"** para começar
-2. Alternancia automática entre Jogador e Computador
+2. Alternancia automática entre Jogador e O ganancioso
 3. Cada rodada mostra:
    - Joias disponíveis
    - Decisões tomadas (✅ ✂️ ❌)
@@ -96,12 +101,13 @@ npm run dev
    - Log de decisões
 
 4. **Rodadas 1-4**: Seleção aleatória
-5. **Rodada 5**: Computador usa Greedy, você recebe aleatório
+5. **Rodada 5**: O ganancioso usa Greedy, você recebe aleatório
 
 ### Resultado
+
 - Placar acumulativo em tempo real
 - Histórico de todas as 5 rodadas
-- Banner final com vencedor (🎉 Vitória / 🤖 Derrota / 🤝 Empate)
+- Banner final com vencedor (🎉 Vitória / 👾 Derrota / 🤝 Empate)
 - Botão "Jogar Novamente" para replay
 
 ---
@@ -109,23 +115,25 @@ npm run dev
 ## 📊 Componentes do Jogo
 
 ### 6 Tipos de Joias
-| Joia | Emoji | Densidade |
-|------|-------|-----------|
-| Diamante | ✨ | 25 val/kg |
-| Esmeralda | 💚 | 18 val/kg |
-| Rubi | 🔴 | 15 val/kg |
-| Safira | 🔵 | 12 val/kg |
-| Topázio | 🟡 | 10 val/kg |
-| Ametista | 🟣 | 8 val/kg |
+
+| Joia      | Emoji | Densidade |
+| --------- | ----- | --------- |
+| Diamante  | ✨    | 25 val/kg |
+| Esmeralda | 💚    | 18 val/kg |
+| Rubi      | 🔴    | 15 val/kg |
+| Safira    | 🔵    | 12 val/kg |
+| Topázio   | 🟡    | 10 val/kg |
+| Ametista  | 🟣    | 8 val/kg  |
 
 ### Capacidades
+
 - **Mochila**: 20kg
 - **Rodadas**: 5 por jogador
 - **Pesos de Joias**: 0.5-3.5kg (aleatório)
 
 ---
 
-## 🤖 Algoritmo Greedy Implementado
+## 👾 Algoritmo Greedy Implementado
 
 ```javascript
 // Pseudocódigo do Greedy Knapsack Fracionário
@@ -138,6 +146,7 @@ npm run dev
 ```
 
 ### Resultado
+
 - ✅ Solução **ótima** para Knapsack fracionário
 - ✅ Complexidade: O(n log n) para ordenação
 - ✅ Diferente do 0/1 Knapsack (NP-Hard)
@@ -147,18 +156,21 @@ npm run dev
 ## 🎨 Técnica e Design
 
 ### Stack Tecnológico
+
 - **React 19**: UI interativa
 - **Vite**: Build otimizado
 - **CSS3**: Animações e gradientes
 - **JavaScript ES6+**: Lógica moderna
 
 ### Design
+
 - **Tema Escuro**: Dark mode com gradientes purple/violet
 - **Responsivo**: Funciona em desktop e mobile
 - **Animações**: Suaves e agradáveis
 - **Acessibilidade**: Cores contrastantes, emojis descritivos
 
 ### Performance
+
 ```
 Build Size (gzip):
 - HTML: 0.29 kB
@@ -172,20 +184,23 @@ Total: ~65 kB
 ## 📈 Estatísticas do Jogo
 
 ### Teste Realizado
+
 Rodada de teste completa executada:
+
 - ✅ 5 rodadas completadas
 - ✅ Alternância correta entre jogadores
 - ✅ Placar acumulativo funcionando
 - ✅ Histórico de rodadas exibido
 - ✅ Resultado final com vencedor
 
-**Resultado**: Jogador **401.10** vs Computador **262.90** ✅
+**Resultado**: Jogador **401.10** vs O ganancioso **262.90** ✅
 
 ---
 
 ## 🚀 Como Usar
 
 ### Desenvolvimento
+
 ```bash
 npm run dev     # Inicia servidor de desenvolvimento (Vite)
 npm run build   # Compila para produção
@@ -194,7 +209,9 @@ npm run lint    # Valida código com ESLint
 ```
 
 ### Deploy
+
 Arquivo pronto em `dist/` para publicar em:
+
 - Vercel, Netlify, GitHub Pages
 - Qualquer servidor HTTP estático
 
@@ -221,19 +238,22 @@ Dois arquivos de documentação foram criados:
 ## ✨ Diferenciais
 
 ### Educacional
+
 - 📚 Demonstra algoritmo Greedy de forma interativa
 - 🎮 Gamificação torna aprendizado mais engajante
 - 📊 Visualização clara de decisões do algoritmo
 
 ### Técnico
+
 - 🏗️ Arquitetura modular e reutilizável
 - 🎨 Design moderno e profissional
 - ⚡ Performance otimizada
 - 📱 Responsivo para múltiplos dispositivos
 
 ### Funcional
+
 - 🎯 Jogabilidade fluida
-- 🤖 Computador com IA (Greedy + Sorte)
+- 👾 O ganancioso com IA (Greedy + Sorte)
 - 📈 Sistema de pontuação justo
 - 🔄 Replay infinito
 
