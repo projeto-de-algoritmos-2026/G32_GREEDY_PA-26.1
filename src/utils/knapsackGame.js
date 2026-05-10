@@ -1,11 +1,18 @@
+import diamondImg from '../assets/diamond.png'
+import emeraldImg from '../assets/emerald.png'
+import rubyImg from '../assets/ruby.png'
+import sapphireImg from '../assets/sapphire.png'
+import topazImg from '../assets/topaz.png'
+import amethystImg from '../assets/amethyst.png'
+
 // Tipos de joias disponíveis (divisíveis)
 export const ALL_GEM_TYPES = [
-  { id: 'diamond', name: 'Diamante', image: '/src/assets/diamond.png', density: 25 },
-  { id: 'emerald', name: 'Esmeralda', image: '/src/assets/emerald.png', density: 18 },
-  { id: 'ruby', name: 'Rubi', image: '/src/assets/ruby.png', density: 15 },
-  { id: 'sapphire', name: 'Safira', image: '/src/assets/sapphire.png', density: 12 },
-  { id: 'topaz', name: 'Topázio', image: '/src/assets/topaz.png', density: 10 },
-  { id: 'amethyst', name: 'Ametista', image: '/src/assets/amethyst.png', density: 8 },
+  { id: 'diamond', name: 'Diamante', image: diamondImg, density: 25 },
+  { id: 'emerald', name: 'Esmeralda', image: emeraldImg, density: 18 },
+  { id: 'ruby', name: 'Rubi', image: rubyImg, density: 15 },
+  { id: 'sapphire', name: 'Safira', image: sapphireImg, density: 12 },
+  { id: 'topaz', name: 'Topázio', image: topazImg, density: 10 },
+  { id: 'amethyst', name: 'Ametista', image: amethystImg, density: 8 },
 ]
 
 // Função para obter tipos de gemas selecionados
